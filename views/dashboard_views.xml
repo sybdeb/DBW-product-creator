@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Extend dashboard view met nieuwe tile -->
+    <record id="view_catalog_dashboard_form_inherit_product_creator" model="ir.ui.view">
+        <field name="name">catalog.dashboard.form.product.creator</field>
+        <field name="model">catalog.dashboard</field>
+        <field name="inherit_id" ref="webshop_catalog_dashboard.view_dashboard_form"/>
+        <field name="arch" type="xml">
+            <!-- Voeg nieuwe tile toe na de prijsdaling tile -->
+            <xpath expr="//div[@class='row mt16 o_dashboard']" position="inside">
+                <div class="col-lg-4 col-md-6 mb16">
+                    <div class="card border-warning">
+                        <div class="card-body">
+                            <h3 class="text-warning">
+                                <i class="fa fa-exclamation-triangle"/>
+                                <field name="missing_products_count"/>
+                            </h3>
+                            <p class="text-muted">Ontbrekende Producten</p>
+                            <button type="object" name="action_view_missing_products"
+                                    class="btn btn-warning btn-sm" string="Bekijk"/>
+                        </div>
+                    </div>
+                </div>
+            </xpath>
+        </field>
+    </record>
+</odoo>
