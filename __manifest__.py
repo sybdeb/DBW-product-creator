@@ -1,6 +1,6 @@
 {
     'name': 'Webshop Product Creator',
-    'version': '19.0.1.1.0',
+    'version': '19.0.1.1.1',
     'category': 'Website',
     'summary': 'Snel producten aanmaken vanuit supplier errors en dashboard',
     'description': """
@@ -16,8 +16,9 @@ Integreert met:
 - webshop_catalog_dashboard (dashboard tile)
 - supplier_pricelist_sync (error resolution)
     """,
-    'author': 'Nerbys',
+    'author': 'De Bruijn Webworks in samenwerking met Nerbys E-commerce',
     'website': 'https://nerbys.nl',
+    'support': 'info@de-bruijn.email',
     'license': 'LGPL-3',
     'depends': ['purchase', 'product', 'website_sale', 'dbw_odoo_base_v2', 'product_supplier_sync', 'webshop_catalog_dashboard'],
     'data': [

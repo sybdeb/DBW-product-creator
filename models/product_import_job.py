@@ -10,6 +10,29 @@ class ProductImportJob(models.Model):
     _description = 'Product Import Job Queue'
     _order = 'create_date desc'
 
+    def _is_error_open(self, error):
+        if 'state' in error._fields and error.state not in (False, 'unresolved'):
+            return False
+        if 'resolved' in error._fields and error.resolved:
+            return False
+        return True
+
+    def _mark_error_resolved(self, error):
+        vals = {}
+        if 'resolved' in error._fields:
+            vals['resolved'] = True
+        if 'state' in error._fields:
+            vals['state'] = 'resolved'
+        if 'resolved_date' in error._fields:
+            vals['resolved_date'] = fields.Datetime.now()
+        if 'resolved_by' in error._fields:
+            vals['resolved_by'] = self.env.user.id
+
+        if vals:
+            error.write(vals)
+            return True
+        return False
+
     name = fields.Char(string='Job Name', required=True)
     state = fields.Selection([
         ('pending', 'Wachtrij'),
@@ -72,7 +95,7 @@ class ProductImportJob(models.Model):
             skipped_count = 0
             batch_size = min(self.batch_size or 100, 500)
             
-            errors_to_process = self.error_ids.filtered(lambda e: not e.resolved if hasattr(e, 'resolved') else True)
+            errors_to_process = self.error_ids.filtered(lambda e: self._is_error_open(e))
             total_errors = len(errors_to_process)
             
             if total_errors == 0:
@@ -109,9 +132,7 @@ class ProductImportJob(models.Model):
                             if existing:
                                 # Product already exists - resolve/delete the error
                                 try:
-                                    if hasattr(error, 'resolved'):
-                                        error.write({'resolved': True})
-                                    else:
+                                    if not self._mark_error_resolved(error):
                                         error.unlink()
                                 except Exception as e:
                                     _logger.warning('Job %s: Failed to resolve duplicate error %s: %s', 
@@ -140,6 +161,8 @@ class ProductImportJob(models.Model):
                             'purchase_ok': True,
                             'website_published': False,
                         }
+                        if 'is_published' in self.env['product.template']._fields:
+                            product_vals['is_published'] = False
                         
                         product = self.env['product.template'].create(product_vals)
                         created_count += 1
@@ -156,8 +179,7 @@ class ProductImportJob(models.Model):
                         
                         # Mark error as resolved or delete
                         try:
-                            if hasattr(error, 'resolved'):
-                                error.write({'resolved': True})
+                            if self._mark_error_resolved(error):
                                 _logger.debug('Job %s: Marked error %s as resolved', self.id, error.id)
                             else:
                                 error.unlink()

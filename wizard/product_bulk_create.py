@@ -8,6 +8,22 @@ class ProductBulkCreate(models.TransientModel):
     _name = 'product.bulk.create'
     _description = 'Bulk Producten Aanmaken vanuit Supplier Errors'
 
+    def _mark_error_resolved(self, error):
+        vals = {}
+        if 'resolved' in error._fields:
+            vals['resolved'] = True
+        if 'state' in error._fields:
+            vals['state'] = 'resolved'
+        if 'resolved_date' in error._fields:
+            vals['resolved_date'] = fields.Datetime.now()
+        if 'resolved_by' in error._fields:
+            vals['resolved_by'] = self.env.user.id
+
+        if vals:
+            error.write(vals)
+            return True
+        return False
+
     error_ids = fields.Many2many('supplier.import.error', string='Te Verwerken Errors')
     categ_id = fields.Many2one('product.category', string='Standaard Categorie', required=True)
     public_categ_ids = fields.Many2many('product.public.category', string='Website Categorieën')
@@ -184,6 +200,9 @@ class ProductBulkCreate(models.TransientModel):
                         'purchase_ok': True,
                         'website_published': False,
                     }
+
+                    if 'is_published' in self.env['product.template']._fields:
+                        product_vals['is_published'] = False
                     
                     product = self.env['product.template'].create(product_vals)
                     created_products.append(product.id)
@@ -200,8 +219,7 @@ class ProductBulkCreate(models.TransientModel):
                     
                     # Verwijder error (of markeer als resolved als veld bestaat)
                     try:
-                        # Probeer eerst resolved=True (als veld bestaat)
-                        line.error_id.write({'resolved': True})
+                        self._mark_error_resolved(line.error_id)
                     except Exception:
                         # Anders verwijder de error regel
                         line.error_id.unlink()
@@ -307,7 +325,7 @@ class ProductBulkCreate(models.TransientModel):
                     if is_duplicate:
                         # Resolve/delete the error since product exists
                         try:
-                            error.write({'resolved': True})
+                            self._mark_error_resolved(error)
                         except Exception:
                             try:
                                 error.unlink()
@@ -327,6 +345,8 @@ class ProductBulkCreate(models.TransientModel):
                     'purchase_ok': True,
                     'website_published': False,
                 }
+                if 'is_published' in self.env['product.template']._fields:
+                    vals['is_published'] = False
                 product_vals_list.append(vals)
                 error_mapping[len(product_vals_list) - 1] = error
             
@@ -339,9 +359,10 @@ class ProductBulkCreate(models.TransientModel):
                 errors_to_delete = [error_mapping.get(idx) for idx in range(len(products)) if error_mapping.get(idx)]
                 if errors_to_delete:
                     try:
-                        # Try bulk delete
-                        self.env['supplier.import.error'].browse([e.id for e in errors_to_delete]).unlink()
-                        _logger.info('Deleted %s error records', len(errors_to_delete))
+                        self.env['supplier.import.error'].browse([e.id for e in errors_to_delete]).filtered(lambda e: e.exists())
+                        for error in errors_to_delete:
+                            self._mark_error_resolved(error)
+                        _logger.info('Resolved %s error records', len(errors_to_delete))
                     except Exception as e:
                         _logger.error('Failed to delete errors: %s', str(e))
             
