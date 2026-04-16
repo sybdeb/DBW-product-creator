@@ -9,20 +9,33 @@ class ProductBulkCreate(models.TransientModel):
     _description = 'Bulk Producten Aanmaken vanuit Supplier Errors'
 
     def _mark_error_resolved(self, error):
-        vals = {}
-        if 'resolved' in error._fields:
-            vals['resolved'] = True
-        if 'state' in error._fields:
-            vals['state'] = 'resolved'
-        if 'resolved_date' in error._fields:
-            vals['resolved_date'] = fields.Datetime.now()
-        if 'resolved_by' in error._fields:
-            vals['resolved_by'] = self.env.user.id
-
-        if vals:
-            error.write(vals)
-            return True
-        return False
+        """Mark an error as resolved - handles both resolved and state fields"""
+        try:
+            vals = {}
+            if 'resolved' in error._fields:
+                vals['resolved'] = True
+            if 'resolved_date' in error._fields:
+                vals['resolved_date'] = fields.Datetime.now()
+            if 'resolved_by' in error._fields:
+                vals['resolved_by'] = self.env.user.id
+            
+            # Try to update state field - may fail if read-only, try anyway
+            if 'state' in error._fields:
+                vals['state'] = 'resolved'
+            
+            if vals:
+                error.write(vals)
+        except Exception as e:
+            # If write failed, try setting just resolved=True
+            _logger.warning('Error marking %s as resolved: %s. Trying fallback.', error.id, str(e))
+            try:
+                if 'resolved' in error._fields:
+                    error.write({'resolved': True})
+            except Exception as e2:
+                _logger.warning('Fallback also failed for error %s: %s', error.id, str(e2))
+                return False
+        
+        return True
 
     error_ids = fields.Many2many('supplier.import.error', string='Te Verwerken Errors')
     categ_id = fields.Many2one('product.category', string='Standaard Categorie', required=True)
