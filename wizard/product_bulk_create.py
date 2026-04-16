@@ -191,13 +191,8 @@ class ProductBulkCreate(models.TransientModel):
                             _logger.info('Skipping duplicate: %s (matches %s)', line.name, existing.name)
                             # Resolve/delete the error since product exists
                             if line.error_id:
-                                try:
-                                    line.error_id.write({'resolved': True})
-                                except Exception:
-                                    try:
-                                        line.error_id.unlink()
-                                    except Exception:
-                                        pass
+                                # Use _mark_error_resolved to handle both resolved + state fields with fallback
+                                self._mark_error_resolved(line.error_id)
                             skipped += 1
                             continue
                     
